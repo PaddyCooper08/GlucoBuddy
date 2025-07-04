@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "dotenv": "^17.0.1",
+    "libre-link-unofficial-api": "^1.0.0-alpha.7",
+    "node-telegram-bot-api": "^0.66.0",
+    "nodemon": "^3.1.10"
+  }
+}
