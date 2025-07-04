@@ -26,6 +26,7 @@ bolus = (0.165 * carbs) + (0.255 * max(0, currentBG - 7))
 - Node.js (v16 or higher recommended)
 - A Telegram bot token (get one from [@BotFather](https://t.me/BotFather))
 - Your Libre Link Up account credentials
+- A publicly accessible webhook URL (for production deployment)
 
 ### Installation
 
@@ -43,11 +44,34 @@ bolus = (0.165 * carbs) + (0.255 * max(0, currentBG - 7))
    TELEGRAM_BOT_TOKEN=your-telegram-bot-token
    LIBRE_LINK_EMAIL=your-libre-link-up-email
    LIBRE_LINK_PASSWORD=your-libre-link-up-password
+   WEBHOOK_URL=https://your-domain.com
+   PORT=3000
    ```
 4. **Start the bot:**
    ```bash
    node main.js
    ```
+
+### Webhook Configuration
+
+This bot now uses webhooks instead of polling for better performance and reliability.
+
+**For Production:**
+
+- Set `WEBHOOK_URL` to your publicly accessible domain (e.g., `https://your-domain.com`)
+- The bot will automatically set the webhook to `https://your-domain.com/bot<your-bot-token>`
+- Make sure your server is accessible from the internet and uses HTTPS
+
+**For Development:**
+
+- You can use tools like [ngrok](https://ngrok.com/) to create a public tunnel to your local server
+- Example: `ngrok http 3000` will give you a public URL like `https://abc123.ngrok.io`
+- Set this as your `WEBHOOK_URL`
+
+**Health Check:**
+
+- The bot includes a health check endpoint at `/health`
+- You can monitor your bot's status by visiting `https://your-domain.com/health`
 
 ## Usage
 
