@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const TelegramBot = require('node-telegram-bot-api');
 const { LibreLinkClient } = require('libre-link-unofficial-api');
+const http = require('http');
 
 // --- Configuration ---
 // It is strongly recommended to use environment variables for sensitive data.
@@ -135,6 +136,22 @@ bot.onText(/mungbeans (\d+)/, async (msg, match) => {
       bot.sendMessage(chatId, 'Sorry, something went wrong while calculating bolus.');
     }
   }
+});
+
+// Add health check server for Cloud Run
+const port = process.env.PORT || 8080;
+const server = http.createServer((req, res) => {
+  if (req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
+  } else {
+    res.writeHead(404);
+    res.end('Not Found');
+  }
+});
+
+server.listen(port, () => {
+  console.log(`Health check server running on port ${port}`);
 });
 
 console.log('GlucoBuddy Telegram bot is running...');
