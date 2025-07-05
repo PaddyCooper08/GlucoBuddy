@@ -2,19 +2,63 @@ require('dotenv').config();
 
 const TelegramBot = require('node-telegram-bot-api');
 const { LibreLinkClient } = require('libre-link-unofficial-api');
-const http = require('http');
+const express = require('express');
 
 // --- Configuration ---
 // It is strongly recommended to use environment variables for sensitive data.
 const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN 
 const libreLinkEmail = process.env.LIBRE_LINK_EMAIL 
 const libreLinkPassword = process.env.LIBRE_LINK_PASSWORD 
+const webhookUrl = process.env.WEBHOOK_URL // Your public webhook URL
+const port = process.env.PORT || 3000;
+
 console.log('Using Telegram Bot Token:', telegramBotToken);
 
 // --- Initialization ---
 
-// Initialize Telegram Bot with additional options
-const bot = new TelegramBot(telegramBotToken, {polling: true});
+// Initialize Telegram Bot without polling
+const bot = new TelegramBot(telegramBotToken);
+
+// Initialize Express app
+const app = express();
+
+// Parse JSON bodies
+app.use(express.json());
+
+// Set webhook
+if (webhookUrl) {
+  bot.setWebHook(`${webhookUrl}/bot${telegramBotToken}`)
+    .then(() => {
+      console.log('Webhook set successfully to:', `${webhookUrl}/bot${telegramBotToken}`);
+    })
+    .catch((error) => {
+      console.error('Failed to set webhook:', error);
+    });
+} else {
+  console.warn('WEBHOOK_URL not provided. Please set it in your environment variables.');
+  console.warn('The bot will not receive messages without a valid webhook URL.');
+}
+
+// Webhook endpoint
+app.post(`/bot${telegramBotToken}`, (req, res) => {
+  try {
+    bot.processUpdate(req.body);
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Error processing webhook update:', error);
+    res.sendStatus(500);
+  }
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Start the Express server
+app.listen(port, () => {
+  console.log(`GlucoBuddy webhook server is running on port ${port}`);
+});
 
 
 // Initialize LibreLinkClient
@@ -136,22 +180,6 @@ bot.onText(/mungbeans (\d+)/, async (msg, match) => {
       bot.sendMessage(chatId, 'Sorry, something went wrong while calculating bolus.');
     }
   }
-});
-
-// Add health check server for Cloud Run
-const port = process.env.PORT || 8080;
-const server = http.createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('OK');
-  } else {
-    res.writeHead(404);
-    res.end('Not Found');
-  }
-});
-
-server.listen(port, () => {
-  console.log(`Health check server running on port ${port}`);
 });
 
 console.log('GlucoBuddy Telegram bot is running...');
