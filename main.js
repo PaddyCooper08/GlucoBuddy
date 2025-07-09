@@ -3,18 +3,25 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const { LibreLinkClient } = require('libre-link-unofficial-api');
 const http = require('http');
+const { GoogleGenAI } = require("@google/genai");
+
+
 
 // --- Configuration ---
 // It is strongly recommended to use environment variables for sensitive data.
 const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN 
 const libreLinkEmail = process.env.LIBRE_LINK_EMAIL 
 const libreLinkPassword = process.env.LIBRE_LINK_PASSWORD 
+const geminiApiKey = process.env.GEMINI_API_KEY;
 console.log('Using Telegram Bot Token:', telegramBotToken);
 
 // --- Initialization ---
 
 // Initialize Telegram Bot with additional options
 const bot = new TelegramBot(telegramBotToken, {polling: true});
+
+// Initialize Google Generative AI
+const ai = new GoogleGenAI({geminiApiKey});
 
 
 // Initialize LibreLinkClient
@@ -86,18 +93,13 @@ bot.onText(/sugar/, async (msg) => {
   }
 });
 
-// Listen for the /bolus command
-bot.onText(/mungbeans (\d+)/, async (msg, match) => {
-  const chatId = msg.chat.id;
-  const carbs = parseInt(match[1]);
-
-  if (isNaN(carbs) || carbs <= 0) {
-    bot.sendMessage(chatId, 'Please provide a valid number of carbs. Example: /bolus 45');
-    return;
-  }
-
+// Helper function to calculate and send bolus information
+async function calculateAndSendBolus(chatId, carbs, foodDescription = null) {
   try {
-    bot.sendMessage(chatId, 'Calculating bolus dose, please wait...');
+    const initialMessage = foodDescription 
+      ? `AI estimated ${carbs}g carbs for "${foodDescription}".\nFetching sugar and calculating bolus...`
+      : `Calculating bolus for ${carbs}g carbs...`;
+    bot.sendMessage(chatId, initialMessage);
 
     // Log in only if not already logged in
     if (!isLoggedIn) {
@@ -115,9 +117,9 @@ bot.onText(/mungbeans (\d+)/, async (msg, match) => {
       const totalBolus = calculateBolus(carbs, currentBG, targetBG);
 
       const message = `💉 Bolus Calculation:
+${foodDescription ? `🍽️ Meal: ${foodDescription}\n` : ''}🍞 Carbs: ${carbs}g
 📊 Current BG: ${currentBG.toFixed(1)} mmol/L
 🎯 Target BG: ${targetBG} mmol/L
-🍞 Carbs: ${carbs}g
 
 💉 Total Bolus: ${totalBolus.toFixed(2)} units`;
 
@@ -135,6 +137,68 @@ bot.onText(/mungbeans (\d+)/, async (msg, match) => {
     } else {
       bot.sendMessage(chatId, 'Sorry, something went wrong while calculating bolus.');
     }
+  }
+}
+
+// Listen for the /bolus command
+bot.onText(/mungbeans (\d+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const carbs = parseInt(match[1]);
+
+  if (isNaN(carbs) || carbs <= 0) {
+    bot.sendMessage(chatId, 'Please provide a valid number of carbs. Example: /mungbeans 45');
+    return;
+  }
+
+  await calculateAndSendBolus(chatId, carbs);
+});
+
+// Listen for any message to use as a food description for carb calculation
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+
+  // Ignore empty messages or messages from other bots
+  if (!text || msg.from.is_bot) {
+    return;
+  }
+
+  // Ignore commands that are handled by other listeners
+  if (text.startsWith('sugar') || text.startsWith('mungbeans')) {
+    return;
+  }
+
+  // The entire message is treated as the food description
+  const foodDescription = text;
+
+  try {
+    bot.sendMessage(chatId, `Asking the AI to calculate carbs for: "${foodDescription}"...`);
+
+    const prompt = `How many carbs are in ${foodDescription}? Provide only the total number of carbs in grams as a single number.`;
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+    const aiResponseText = result.text;
+
+    // Extract the first number (float or int) from the AI's response
+    const numberMatch = aiResponseText.match(/\d+(\.\d+)?/);
+    const carbsRaw = numberMatch ? parseFloat(numberMatch[0]) : NaN;
+
+    if (isNaN(carbsRaw)) {
+      bot.sendMessage(chatId, `The AI's response ("${aiResponseText}") could not be understood as a number. Please try again.`);
+      return;
+    }
+
+    // Round the carb value to 2 decimal places
+    const carbs = parseFloat(carbsRaw.toFixed(2));
+
+    // Pass the carb count to the bolus calculation function
+    await calculateAndSendBolus(chatId, carbs, foodDescription);
+
+  } catch (error) {
+    console.error('Error with Gemini API:', error);
+    bot.sendMessage(chatId, 'Sorry, I had a problem asking the AI. Please try again later.');
   }
 });
 
