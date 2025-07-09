@@ -18,48 +18,16 @@ console.log('Using Telegram Bot Token:', telegramBotToken);
 // --- Initialization ---
 
 // Initialize Telegram Bot without polling
-const bot = new TelegramBot(telegramBotToken);
+const bot = new TelegramBot(telegramBotToken, {polling: true});
 
 // Initialize Express app
-const app = express();
+
 
 // Parse JSON bodies
-app.use(express.json());
 
-// Set webhook
-if (webhookUrl) {
-  bot.setWebHook(`${webhookUrl}/bot${telegramBotToken}`)
-    .then(() => {
-      console.log('Webhook set successfully to:', `${webhookUrl}/bot${telegramBotToken}`);
-    })
-    .catch((error) => {
-      console.error('Failed to set webhook:', error);
-    });
-} else {
-  console.warn('WEBHOOK_URL not provided. Please set it in your environment variables.');
-  console.warn('The bot will not receive messages without a valid webhook URL.');
-}
 
 // Webhook endpoint
-app.post(`/bot${telegramBotToken}`, (req, res) => {
-  try {
-    bot.processUpdate(req.body);
-    res.sendStatus(200);
-  } catch (error) {
-    console.error('Error processing webhook update:', error);
-    res.sendStatus(500);
-  }
-});
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
-// Start the Express server
-app.listen(port, () => {
-  console.log(`GlucoBuddy webhook server is running on port ${port}`);
-});
 
 // Initialize Google Generative AI
 const ai = new GoogleGenAI({geminiApiKey});
