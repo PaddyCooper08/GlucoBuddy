@@ -87,7 +87,22 @@
 
       if (reading && reading.value) {
         const convertedValue = (reading.value / 18).toFixed(1);
-        bot.sendMessage(chatId, convertedValue);
+        const timestamp = reading.timestamp || reading.date || new Date().toISOString();
+        const readingDate = new Date(timestamp);
+        const now = new Date();
+        const timeDiff = Math.floor((now - readingDate) / (1000 * 60)); // difference in minutes
+        
+        let timeAgoString;
+        if (timeDiff < 1) {
+          timeAgoString = "just now";
+        } else if (timeDiff < 60) {
+          timeAgoString = `${timeDiff} minute${timeDiff !== 1 ? 's' : ''} ago`;
+        } else {
+          const hours = Math.floor(timeDiff / 60);
+          timeAgoString = `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+        }
+        
+        bot.sendMessage(chatId, `📊 ${convertedValue} mmol/L\n🕐 ${timeAgoString}`);
       } else {
         bot.sendMessage(chatId, 'Could not retrieve blood sugar reading. Please try again later.');
       }
@@ -131,12 +146,27 @@
       if (reading && reading.value) {
         const currentBG = (reading.value / 18); // Convert to mmol/L
         const targetBG = 7; // Target sugar in mmol/L
+        const timestamp = reading.timestamp || reading.date || new Date().toISOString();
+        const readingDate = new Date(timestamp);
+        const now = new Date();
+        const timeDiff = Math.floor((now - readingDate) / (1000 * 60)); // difference in minutes
+        
+        let timeAgoString;
+        if (timeDiff < 1) {
+          timeAgoString = "just now";
+        } else if (timeDiff < 60) {
+          timeAgoString = `${timeDiff} minute${timeDiff !== 1 ? 's' : ''} ago`;
+        } else {
+          const hours = Math.floor(timeDiff / 60);
+          timeAgoString = `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+        }
 
         const totalBolus = calculateBolus(carbs, currentBG, targetBG);
 
         const message = `💉 Bolus Calculation:
 ${foodDescription ? `🍽️ Meal: ${foodDescription}\n` : ''}🍞 Carbs: ${carbs}g
 📊 Current BG: ${currentBG.toFixed(1)} mmol/L
+🕐 Reading: ${timeAgoString}
 🎯 Target BG: ${targetBG} mmol/L
 
 💉 Total Bolus: ${totalBolus.toFixed(2)} units`;
